@@ -1,0 +1,4 @@
+library(knitr)
+print("Hello World")
+render_markdown()
+knit("Test.r")

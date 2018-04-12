@@ -1,0 +1,169 @@
+---
+title: "iris_plot_classification"
+author: "Raghu"
+date: "February 13, 2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r Required Packages}
+install.packages("ggplot2")
+install.packages('data.table')
+install.packages('rpart')
+library(ggplot2)
+library(data.table)
+library(rpart)
+```
+
+## Ploting
+   Do various type of plots;
+
+You can also embed plots, for example:
+
+```{r Ploting One variables, echo=FALSE}
+
+mydata=as.data.table(iris)
+dim(mydata)
+
+ggplot(iris,aes(x=Sepal.Length,color='red'))+geom_histogram(size=1)          # Continus var histogram
+p<- ggplot(iris,aes(x=Sepal.Length,color='red'))+geom_histogram(size=1,stat="bin",binwidth =0.2)  # Control no of bins with binwdth;
+p+geom_density(position = "stack")  # Control no of bins with binwdth;
+ggplot(iris,aes(x=Sepal.Length,y=Petal.Length ,color=Species))      #Scatter Plot by Color
+ggplot(iris,aes(x=Species ,y=Sepal.Length,color=Species))+geom_boxplot(size=0.5)        #Box Plot
+ggplot(iris,aes(x=Petal.Length ))+geom_density(alpha=0.02)+geom_histogram(size=0.5)     #Density Plot
+
+#Note now you applying the subsetting of data.table like. So use data.table type structure.
+#Scatter plot with different color
+ggplot(data=mydata[Species=="setosa",],aes(x=Sepal.Length,y=Sepal.Width,color=Species))+geom_point() 
+ggplot(data=iris[iris$Species=="setosa",],aes(x=Sepal.Length,color=Species))+geom_density() #Density Plot
+
+ggplot(data=iris,aes(x=Species,y=Sepal.Width,color=Species))+geom_boxplot() #Box plot by Species;
+```
+
+```{r Ploting Two variables, echo=FALSE}
+
+mydata=as.data.table(iris)
+dim(mydata)
+
+ggplot(iris,aes(x=Sepal.Length,y=Sepal.Width ,color='red'))+geom_point(size=1)          #Scatter Plot
+ggplot(iris,aes(x=Sepal.Length,y=Petal.Length ,color=Species))+geom_point(size=1)       #Scatter Plot by Color
+ggplot(iris,aes(x=Species ,y=Sepal.Length,color=Species))+geom_boxplot(size=0.5)        #Box Plot
+ggplot(iris,aes(x=Petal.Length ))+geom_density(alpha=0.02)+geom_histogram(size=0.5)     #Density Plot
+
+#Note now you applying the subsetting of data.table like. So use data.table type structure.
+#Scatter plot with different color
+ggplot(data=mydata[Species=="setosa",],aes(x=Sepal.Length,y=Sepal.Width,color=Species))+geom_point() 
+ggplot(data=iris[iris$Species=="setosa",],aes(x=Sepal.Length,color=Species))+geom_density() #Density Plot
+
+ggplot(data=iris,aes(x=Species,y=Sepal.Width,color=Species))+geom_boxplot() #Box plot by Species;
+```
+
+There are multiple methods for sampling the data in R. Two methods are below:
+a.) createDataPartition() function in caret package
+b.) sample function in base package;
+c.) sample_n(df, 10) in dplyr package;
+
+
+
+```{r Data Sampling, echo=FALSE}
+
+mydata<- complete.cases(as.data.table(diamonds))
+#Sample Indexes
+indexes = sample(1:nrow(mydata), size=0.33*nrow(mydata))
+# Split data
+test = mydata[indexes,]
+dim(test)
+train = mydata[-indexes,]
+dim(train) 
+```
+
+```{r Fit Regression Tree Sampling, echo=FALSE}
+
+#build a Regression Tree model
+RegTreemod=rpart(formula=price~carat+color+clarity+depth+cut
+                 , data=train
+                 , method="anova"
+                 , control=rpart.control(minsplit=10, cp=0.001)
+                 ,parms=list(split="information")  #Criteria to use for split
+                 )
+summary(RegTreemod)
+
+#Print some model Info; See the plot from following 3 lines does not look good;
+par(xpd = TRUE) 
+plot(RegTreemod, uniform=TRUE) 
+text(RegTreemod, use.n = TRUE)
+
+#Lets install and load rpart.plot package. This has better plots;
+if("rpart.plot" %in% rownames(installed.packages()) == FALSE) {install.packages("rpart.plot")}
+require(rpart.plot)
+
+#Usually the code below should plot it well.
+rpart.plot(RegTreemod,fallen.leaves= FALSE)
+prp(RegTreemod, extra=1, uniform=F, branch=1, yesno=F, border.col=0, xsep="/",box.palette=c("pink", "palegreen3"))
+
+#Or you can use code below for better ploting. Experiment more for even better veiws;
+heat.tree <- function(tree, low.is.green=FALSE, ...) { # dots args passed to prp
+y <- tree$frame$yval
+if(low.is.green)
+y <- -y
+max <- max(y)
+min <- min(y)
+cols <- rainbow(99, end=.36)[
+ifelse(y > y[1], (y-y[1]) * (99-50) / (max-y[1]) + 50,
+(y-min) * (50-1) / (y[1]-min) + 1)]
+prp(tree, branch.col=cols, box.col=cols, ...)
+}
+
+heat.tree(RegTreemod, type=4, varlen=0, faclen=0, fallen.leaves=TRUE)
+```
+```{r Predict on test data and check the fit, echo=FALSE}
+
+# Sometime we have prediction issues when test and train factors are not the same. You can apply
+#any of the following tricks to make the test levels same and train before you can prediction();
+
+#Method1: Enumeration method for each factor level;
+    # levels(test$carat) <- levels(train$carat)
+    # levels(test$color) <- levels(train$color)
+    # levels(test$clarity) <- levels(train$clarity)
+
+#Method2: Same as above but cleaner; no enumeration, uses loop;
+    common <- intersect(names(train), names(test))
+    for (p in common) {
+      if (is.factor(train[[p]])) {
+        levels(test[[p]]) <- levels(train[[p]])
+      }
+    }
+
+#Method3: Add one row of train line and then delete the train line;Smart trick;
+    # test <- rbind(train[1, ] , test)
+    # test <- test[-1,]
+    
+
+
+test_pred=predict(object=RegTreemod
+                  ,newdata=test[,.(carat,color,clarity,depth,cut)]
+                  ,type= "vector"  #You can use other options; for regression tree vector is used;
+                  )
+View(as.data.table(test_pred))
+
+#Lets plot the result;
+plot(test_pred,test$price)
+
+#Lets do a better plot of result with ggplot2;
+require(ggplot2)
+ggplot(,aes(x=test_pred,y=test$price))+geom_point()+xlim(c(0,15000)) +ylim(c(0,15000))+geom_smooth()
+
+```
+
+
+
+
